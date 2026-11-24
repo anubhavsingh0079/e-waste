@@ -1,0 +1,110 @@
+const CATS=["Mobile Phones","Laptops","Computers","Chargers and Cables","Batteries","Keyboards and Mouse","Printers","Televisions","Other Electronic Devices"];
+const WT={"Mobile Phones":.2,"Laptops":2.2,"Computers":8,"Chargers and Cables":.15,"Batteries":.05,"Keyboards and Mouse":.5,"Printers":6,"Televisions":10,"Other Electronic Devices":1};
+const STAT=["Request Submitted","Pickup Scheduled","Collector Assigned","Pickup Completed","Sent to Authorised Recycler","Recycling Verified"];
+const ITEMS=[["👕","Eco T-Shirt",500],["🍶","Steel Water Bottle",350],["📓","Recycled Notebook",150],["👜","Cotton Tote Bag",250],["🌱","Seed Kit",120],["🖊️","Bamboo Pen Set",100],["🎒","Laptop Backpack",900],["🔋","Solar Power Bank",1200]];
+const RATES0={"Mobile Phones":100,"Laptops":300,"Computers":250,"Chargers and Cables":15,"Batteries":10,"Keyboards and Mouse":30,"Printers":150,"Televisions":200,"Other Electronic Devices":25};
+let mem=null;
+const load=()=>{try{return JSON.parse(localStorage.getItem("ecotrace"))}catch(e){return mem}};
+const save=()=>{mem=D;try{localStorage.setItem("ecotrace",JSON.stringify(D))}catch(e){}};
+let D=load()||{users:[],pickups:[],tx:[],notes:[],rates:RATES0,session:null};
+const sha=async s=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,"0")).join("");
+(async()=>{if(!D.users.some(u=>u.role==="admin")){D.users.push({id:"admin",name:"Administrator",email:"admin@ecotrace.demo",phone:"",pw:await sha("admin123"),role:"admin"});save()}route()})();
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const me=()=>D.users.find(u=>u.id===D.session);
+const $=s=>document.querySelector(s);
+const toast=m=>{const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),2800)};
+const bal=uid=>{const t=D.tx.filter(x=>x.uid===uid);const e=t.filter(x=>x.amt>0).reduce((a,x)=>a+x.amt,0),r=-t.filter(x=>x.amt<0).reduce((a,x)=>a+x.amt,0);return{e,r,b:e-r}};
+const notify=(uid,msg)=>D.notes.unshift({uid,msg,t:Date.now(),read:false});
+let trackId="";
+
+function navbar(){const u=me(),h=location.hash.slice(1)||"home";
+ const L=[["home","Home"],["how","How It Works"],["schedule","Schedule Pickup"],["track","Track"],["rewards","Rewards Store"],["about","About Us"]];
+ const n=u?D.notes.filter(x=>x.uid===u.id&&!x.read).length:0;
+ $("#nav").innerHTML=`<a class="logo" href="#home">♻️ ECO<b>-TRACE</b></a>`+L.map(([k,v])=>`<a class="l ${h===k?"on":""}" href="#${k}">${v}</a>`).join("")+
+ (u?`<a class="l bell ${h==="wallet"?"on":""}" href="#wallet">${u.role==="admin"?"":"🪙 "+bal(u.id).b+" · "}Dashboard${n?`<i>${n}</i>`:""}</a>${u.role==="admin"?`<a class="l" href="#admin">Admin</a>`:""}<a class="btn s" href="#" id="out">Logout</a>`:`<a class="btn s" href="#auth">Login / Sign Up</a>`);
+ const o=$("#out");if(o)o.onclick=e=>{e.preventDefault();D.session=null;save();location.hash="home";route()};
+}
+function route(){navbar();const h=(location.hash.slice(1)||"home");const f=V[h]||V.home;$("#app").innerHTML=`<div class="view">${f()}</div>`;window.scrollTo(0,0);(A[h]||(()=>{}))()}
+window.addEventListener("hashchange",route);
+
+const hero=`<svg viewBox="0 0 360 300" role="img" aria-label="Devices flowing into a recycling bin" style="width:100%;max-width:400px">
+<circle cx="180" cy="150" r="130" fill="#ffffff14"/><rect x="120" y="150" width="120" height="120" rx="16" fill="#1f9d55"/><rect x="108" y="136" width="144" height="22" rx="8" fill="#3ed17f"/>
+<text x="180" y="228" font-size="64" text-anchor="middle" fill="#fff">♻</text>
+<rect x="52" y="40" width="46" height="76" rx="8" fill="#e8f1ec" transform="rotate(-14 75 78)"/><rect x="60" y="50" width="30" height="48" rx="3" fill="#0d2238" transform="rotate(-14 75 78)"/>
+<rect x="230" y="30" width="86" height="56" rx="6" fill="#e8f1ec" transform="rotate(12 273 58)"/><rect x="238" y="37" width="70" height="38" rx="2" fill="#14405a" transform="rotate(12 273 58)"/>
+<rect x="160" y="14" width="40" height="22" rx="4" fill="#ffd166"/><path d="M180 44v50" stroke="#3ed17f" stroke-width="5" stroke-dasharray="6 8"/>
+</svg>`;
+function stats(){const v=D.pickups.filter(p=>p.status>=3);let it=0,kg=0;v.forEach(p=>p.items.forEach(i=>{it+=i.qty;kg+=i.qty*(WT[i.cat]||1)}));
+ return `<div class="grid">${[[Math.round(kg*10)/10+" kg","E-waste collected (estimated from average item weights)"],[D.users.filter(u=>u.role==="user").length,"Registered users"],[it,"Devices recycled (collected pickups)"],[v.length,"Completed pickups"]].map(([a,b])=>`<div class="card stat"><b>${a}</b><span>${b}</span></div>`).join("")}</div><p class="mut">Figures come only from pickups recorded on this platform. We don’t show tree or CO₂ numbers until they can be verified by a recycler report.</p>`}
+const V={
+home:()=>`<section class="hero"><div class="wrap"><div><p class="slogan">SCAN IT. SORT IT. SAVE THE PLANET.</p><h1>Turn Your E-Waste Into Exciting Rewards!</h1><p>Don’t throw away your old electronics. Recycle them responsibly, earn ECO Coins, and redeem exciting rewards.</p><p><a class="btn" href="#schedule">Schedule Free Pickup</a> <a class="btn o" href="#rewards">Explore Rewards</a></p></div><div style="text-align:center">${hero}</div></div></section>
+ <section class="sec wrap"><h2>Our impact so far</h2>${stats()}</section>
+ <section class="sec wrap"><h2>Recycling that pays you back</h2><div class="grid"><div class="card"><div class="ic">📦</div><h3>We come to you</h3><p class="mut">Book a free doorstep pickup in two minutes.</p></div><div class="card"><div class="ic">🔎</div><h3>Track every step</h3><p class="mut">Follow your pickup ID or QR code from request to verified recycling.</p></div><div class="card"><div class="ic">🪙</div><h3>Earn ECO Coins</h3><p class="mut">Coins arrive once our team verifies your collected items.</p></div></div></section>`,
+how:()=>`<section class="sec wrap"><h2>How it works</h2><div class="grid">${[["📝","Register","Create a free account."],["💻","List your devices","Choose categories, quantity and condition, then add photos."],["🚚","Book a pickup","Pick a date, time and address."],["📱","Track it","Use your pickup ID or QR code."],["🪙","Get coins","Credited after verified collection."],["🎁","Redeem","Swap coins for useful products."]].map(([i,a,b],n)=>`<div class="card"><div class="ic">${i}</div><h3>${n+1}. ${a}</h3><p class="mut">${b}</p></div>`).join("")}</div>
+ <h2 style="margin-top:36px">Current ECO Coin values</h2><div class="card scroll"><table class="tbl"><tr><th>Category</th><th>Coins per item</th></tr>${CATS.map(c=>`<tr><td>${c}</td><td>${D.rates[c]}</td></tr>`).join("")}</table></div></section>`,
+about:()=>`<section class="sec wrap"><h2>About ECO-TRACE</h2><div class="card"><p>ECO-TRACE makes responsible e-waste disposal easy and rewarding. Every pickup gets a unique ID and QR code, so you can see it move from your door to an authorised recycler.</p><p class="mut">Old electronics contain materials that are harmful in landfills and valuable when recovered. Handing them to authorised recyclers keeps both in check.</p></div></section>`,
+auth:()=>{const reg=location.hash.includes("reg");return `<section class="sec wrap" style="max-width:480px"><div class="card"><h2 id="at">Welcome back</h2><div id="af"></div><p class="mut" id="al"></p><p class="mut">Demo admin: admin@ecotrace.demo / admin123</p></div></section>`},
+schedule:()=>{if(!me())return gate("Log in to schedule a pickup.");
+ const d=new Date(Date.now()+864e5).toISOString().slice(0,10);
+ return `<section class="sec wrap"><h2>Schedule a free pickup</h2><div class="card"><form id="pf" onsubmit="return false"><h3>Your devices</h3><div id="items"></div><button class="btn o s" id="addi" type="button">+ Add another device</button>
+ <label for="ph">Device photos (optional)</label><input id="ph" type="file" accept="image/*" multiple>
+ <label for="ad">Pickup address</label><textarea id="ad" rows="2" required></textarea>
+ <div class="two"><div><label for="dt">Preferred date</label><input id="dt" type="date" min="${d}" value="${d}" required></div><div><label for="tm">Preferred time</label><select id="tm"><option>9 AM – 12 PM</option><option>12 PM – 3 PM</option><option>3 PM – 6 PM</option></select></div></div>
+ <label for="cn">Contact number</label><input id="cn" type="tel" value="${esc(me().phone)}" required><p class="err" id="pe"></p><p><button class="btn" id="sub">Submit pickup request</button></p></form></div><div id="done"></div></section>`},
+track:()=>{const u=me(),p=D.pickups.find(x=>x.id===trackId.toUpperCase().trim());
+ return `<section class="sec wrap"><h2>Track your pickup</h2><div class="card"><form id="tf" onsubmit="return false"><label for="tid">Pickup ID</label><div style="display:flex;gap:10px"><input id="tid" value="${esc(trackId)}" placeholder="e.g. ECO-A1B2C3"><button class="btn">Track</button></div></form></div>
+ ${trackId?(p?`<div class="card" style="margin-top:18px"><h3>${p.id} <span class="tag">${STAT[p.status]}</span></h3><ul class="tl">${STAT.map((s,i)=>`<li class="${i<=p.status?"done":""}">${s}</li>`).join("")}</ul><p class="mut">${p.items.map(i=>i.qty+"× "+esc(i.name)).join(", ")} · ${esc(p.date)}, ${esc(p.time)}</p></div>`:`<p class="err">No pickup found with that ID. Check the ID on your confirmation and try again.</p>`):""}</section>`},
+rewards:()=>{const u=me();return `<section class="sec wrap"><h2>Rewards store</h2><p class="mut">${u&&u.role==="user"?`Your balance: <b>🪙 ${bal(u.id).b}</b>`:`<a href="#auth">Log in</a> to redeem.`}</p><div class="grid">${ITEMS.map(([i,n,c],x)=>`<div class="card"><div class="ic" style="font-size:3.2rem">${i}</div><h3>${n}</h3><p class="coin" style="font-size:1.4rem">🪙 ${c}</p><button class="btn s rd" data-i="${x}">Redeem</button></div>`).join("")}</div></section>`},
+wallet:()=>{const u=me();if(!u)return gate("Log in to see your dashboard.");if(u.role==="admin")return `<section class="sec wrap"><p>Admins manage the platform from the <a href="#admin">Admin</a> page.</p></section>`;
+ const b=bal(u.id),ps=D.pickups.filter(p=>p.uid===u.id),ns=D.notes.filter(n=>n.uid===u.id);
+ return `<section class="sec wrap"><h2>Hello, ${esc(u.name)}</h2><div class="grid"><div class="card stat"><b>🪙 ${b.b}</b><span>Current balance</span></div><div class="card stat"><b>${b.e}</b><span>Total earned</span></div><div class="card stat"><b>${b.r}</b><span>Redeemed</span></div></div>
+ <div class="grid" style="margin-top:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"><div class="card"><h3>My pickups</h3>${ps.length?ps.map(p=>`<p><a href="#track" class="tk" data-id="${p.id}"><b>${p.id}</b></a> <span class="tag">${STAT[p.status]}</span></p>`).join(""):`<p class="mut">No pickups yet. <a href="#schedule">Schedule your first one.</a></p>`}</div>
+ <div class="card"><h3>Notifications</h3>${ns.length?ns.slice(0,8).map(n=>`<p class="mut">🔔 ${esc(n.msg)}<br><small>${new Date(n.t).toLocaleString()}</small></p>`).join(""):`<p class="mut">Nothing yet.</p>`}</div></div>
+ <div class="card scroll" style="margin-top:18px"><h3>Transaction history</h3>${D.tx.some(t=>t.uid===u.id)?`<table class="tbl"><tr><th>Date</th><th>Details</th><th>Coins</th></tr>${D.tx.filter(t=>t.uid===u.id).map(t=>`<tr><td>${new Date(t.t).toLocaleDateString()}</td><td>${esc(t.note)}</td><td>${t.amt>0?"+":""}${t.amt}</td></tr>`).join("")}</table>`:`<p class="mut">Coins appear here after your first verified pickup.</p>`}</div>
+ <p><button class="btn o s" id="rn">Mark notifications read</button></p></section>`},
+admin:()=>{const u=me();if(!u||u.role!=="admin")return gate("Administrator access only.");
+ return `<section class="sec wrap"><h2>Admin panel</h2><div class="card scroll"><h3>ECO Coin values</h3><div class="grid">${CATS.map((c,i)=>`<div><label>${c}</label><input type="number" min="0" class="rt" data-c="${esc(c)}" value="${D.rates[c]}"></div>`).join("")}</div><p><button class="btn s" id="sr">Save values</button></p><p class="mut">Changes apply to future verifications only.</p></div>
+ <div class="card scroll" style="margin-top:18px"><h3>Pickup requests</h3>${D.pickups.length?`<table class="tbl"><tr><th>ID</th><th>Items</th><th>Status</th><th>Reward</th></tr>${D.pickups.map(p=>`<tr><td><b>${p.id}</b><br><span class="mut">${esc(p.date)}</span></td><td>${p.items.map(i=>i.qty+"× "+esc(i.name)+" ("+esc(i.cond)+")").join("<br>")}<br><span class="mut">${esc(p.addr)} · ${esc(p.phone)}</span></td><td><select class="ss" data-id="${p.id}">${STAT.map((s,i)=>`<option value="${i}" ${i===p.status?"selected":""}>${s}</option>`).join("")}</select></td><td>${p.credited?`<span class="tag">Credited ${p.credited}</span>`:p.status>=3?`<button class="btn s vf" data-id="${p.id}">Verify &amp; credit</button>`:`<span class="mut">After collection</span>`}</td></tr>`).join("")}</table>`:`<p class="mut">No requests yet.</p>`}</div></section>`}
+};
+function gate(m){return `<section class="sec wrap" style="max-width:480px"><div class="card"><h3>${m}</h3><p><a class="btn" href="#auth">Login / Sign Up</a></p></div></section>`}
+
+const A={
+auth(){let mode="login";const f=$("#af");
+ const draw=()=>{$("#at").textContent={login:"Welcome back",reg:"Create your account",forgot:"Reset password"}[mode];
+ f.innerHTML=`<form id="x" onsubmit="return false">${mode==="reg"?`<label for="n">Full name</label><input id="n" required><label for="p">Phone</label><input id="p" type="tel">`:""}<label for="e">Email</label><input id="e" type="email" required><label for="w">${mode==="forgot"?"New password":"Password"}</label><input id="w" type="password" minlength="6" required><p class="err" id="er"></p><button class="btn">${{login:"Log in",reg:"Create account",forgot:"Reset password"}[mode]}</button></form>`;
+ $("#al").innerHTML=mode==="login"?`New here? <a href="#" data-m="reg">Sign up</a> · <a href="#" data-m="forgot">Forgot password?</a>`:`<a href="#" data-m="login">Back to login</a>`;
+ document.querySelectorAll("[data-m]").forEach(a=>a.onclick=e=>{e.preventDefault();mode=a.dataset.m;draw()});
+ $("#x").onsubmit=async e=>{e.preventDefault();const em=$("#e").value.trim().toLowerCase(),pw=await sha($("#w").value),er=$("#er"),u=D.users.find(x=>x.email===em);
+  if(mode==="reg"){if(u)return er.textContent="That email is already registered. Log in instead.";const n={id:"u"+Date.now(),name:$("#n").value.trim(),email:em,phone:$("#p").value.trim(),pw,role:"user"};D.users.push(n);D.session=n.id}
+  else if(mode==="forgot"){if(!u)return er.textContent="No account uses that email.";u.pw=pw;toast("Password updated. Log in with it.");mode="login";save();return draw()}
+  else{if(!u||u.pw!==pw)return er.textContent="Email or password is incorrect.";D.session=u.id}
+  save();location.hash=D.users.find(x=>x.id===D.session).role==="admin"?"admin":"wallet";route()};};
+ draw();if(location.hash.includes("reg")){mode="reg";draw()}},
+schedule(){if(!me())return;const box=$("#items");
+ const add=()=>{const d=document.createElement("div");d.className="row";d.innerHTML=`<div><label>Category</label><select class="c">${CATS.map(c=>`<option>${c}</option>`).join("")}</select></div><div><label>Device name</label><input class="nm" placeholder="e.g. Samsung A12" required></div><div><label>Qty</label><input class="q" type="number" min="1" value="1"></div><div><label>Condition</label><select class="cd"><option>Working</option><option>Damaged</option><option>Not working</option></select></div><button type="button" class="btn d s">✕</button>`;d.querySelector("button").onclick=()=>{if(box.children.length>1)d.remove()};box.append(d)};
+ add();$("#addi").onclick=add;
+ const thumb=f=>new Promise(r=>{const i=new Image,u=URL.createObjectURL(f);i.onload=()=>{const c=document.createElement("canvas"),s=Math.min(1,160/i.width);c.width=i.width*s;c.height=i.height*s;c.getContext("2d").drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);r(c.toDataURL("image/jpeg",.6))};i.onerror=()=>r(null);i.src=u});
+ $("#sub").onclick=async()=>{const pe=$("#pe");pe.textContent="";
+  const items=[...box.children].map(r=>({cat:r.querySelector(".c").value,name:r.querySelector(".nm").value.trim(),qty:Math.max(1,+r.querySelector(".q").value||1),cond:r.querySelector(".cd").value}));
+  if(items.some(i=>!i.name))return pe.textContent="Enter a name for every device.";
+  if(!$("#ad").value.trim())return pe.textContent="Enter your pickup address.";
+  if(!/^[+\d\s-]{7,15}$/.test($("#cn").value.trim()))return pe.textContent="Enter a valid contact number.";
+  const photos=(await Promise.all([...$("#ph").files].slice(0,3).map(thumb))).filter(Boolean);
+  let id;do{id="ECO-"+Math.random().toString(36).slice(2,8).toUpperCase()}while(D.pickups.some(p=>p.id===id));
+  D.pickups.unshift({id,uid:me().id,items,photos,addr:$("#ad").value.trim(),date:$("#dt").value,time:$("#tm").value,phone:$("#cn").value.trim(),status:0,credited:null,t:Date.now()});
+  notify(me().id,`Pickup ${id}: Request Submitted`);try{save()}catch(e){}save();navbar();
+  $("#pf").parentElement.style.display="none";
+  $("#done").innerHTML=`<div class="card" style="text-align:center"><h3>Pickup requested 🎉</h3><p>Your pickup ID is <b style="font-size:1.4rem">${id}</b></p><div id="qr" style="display:inline-block;padding:10px;background:#fff;border-radius:12px"></div><p class="mut">Show this QR code to the collector, or track it anytime.</p><a class="btn" href="#track" id="gt">Track this pickup</a></div>`;
+  try{new QRCode($("#qr"),{text:id,width:160,height:160})}catch(e){$("#qr").textContent="QR unavailable – use ID "+id}
+  $("#gt").onclick=()=>{trackId=id}}},
+track(){$("#tf").onsubmit=e=>{e.preventDefault();trackId=$("#tid").value;route()}},
+rewards(){document.querySelectorAll(".rd").forEach(b=>b.onclick=()=>{const u=me();if(!u||u.role!=="user"){location.hash="auth";return}const[,n,c]=ITEMS[b.dataset.i];
+ if(bal(u.id).b<c)return toast(`You need ${c-bal(u.id).b} more coins for ${n}.`);
+ D.tx.unshift({uid:u.id,amt:-c,note:"Redeemed: "+n,t:Date.now()});notify(u.id,`You redeemed ${n}. We’ll contact you to arrange delivery.`);save();toast(n+" redeemed!");route()})},
+wallet(){document.querySelectorAll(".tk").forEach(a=>a.onclick=()=>{trackId=a.dataset.id});const r=$("#rn");if(r)r.onclick=()=>{D.notes.forEach(n=>{if(n.uid===D.session)n.read=true});save();route()}},
+admin(){const u=me();if(!u||u.role!=="admin")return;
+ $("#sr").onclick=()=>{document.querySelectorAll(".rt").forEach(i=>{D.rates[i.dataset.c]=Math.max(0,+i.value||0)});save();toast("Coin values saved")};
+ document.querySelectorAll(".ss").forEach(s=>s.onchange=()=>{const p=D.pickups.find(x=>x.id===s.dataset.id);p.status=+s.value;notify(p.uid,`Pickup ${p.id}: ${STAT[p.status]}`);save();toast("Status updated, user notified");route()});
+ document.querySelectorAll(".vf").forEach(b=>b.onclick=()=>{const p=D.pickups.find(x=>x.id===b.dataset.id);if(p.credited||p.status<3)return;
+  const amt=p.items.reduce((a,i)=>a+i.qty*(D.rates[i.cat]||0),0);p.credited=amt;D.tx.unshift({uid:p.uid,amt,note:"Verified pickup "+p.id,t:Date.now(),pid:p.id});notify(p.uid,`${amt} ECO Coins credited for pickup ${p.id}`);save();toast(amt+" coins credited");route()})}
+};
